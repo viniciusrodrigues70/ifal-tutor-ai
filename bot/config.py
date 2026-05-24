@@ -16,7 +16,6 @@ if not MONGO_URI:
     print(f"\n❌ ERRO: O arquivo .env foi achado, mas a variável MONGO_URI está vazia!")
     exit(1)
 
-# Vamos mascarar o link para você ver se ele parece correto no terminal
 mascarado = MONGO_URI[:15] + "..." + MONGO_URI[-10:]
 print(f"✅ Arquivo .env carregado com sucesso!")
 print(f"🔗 Link detectado: {mascarado}")
@@ -24,7 +23,6 @@ print(f"🔗 Link detectado: {mascarado}")
 
 try:
     # 3. Conexão com o Banco de Dados
-    # O tlsAllowInvalidCertificates ajuda se o seu PC/Rede tiver bloqueio de SSL
     client = MongoClient(MONGO_URI, tlsAllowInvalidCertificates=True)
     db = client["tutorbot"]
 
