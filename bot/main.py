@@ -19,7 +19,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def limpar(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     colecao_hist.delete_one({"user_id": user_id})
-    await update.message.reply_text("🧹 **Sessão resetada.** Tudo limpo!", parse_mode="Markdown")
+    await update.message.reply_text("🧹 <b>Sessão resetada.</b> Tudo limpo!", parse_mode="HTML")
 
 async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -34,14 +34,14 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data.startswith("mat_"):
         materia = data.split("_", 1)[1]
         colecao_hist.update_one({"user_id": user_id}, {"$set": {"materia_atual": materia}}, upsert=True)
-        await query.edit_message_text(f"Boa! Qual assunto de **{materia}** vamos revisar?", reply_markup=ui.teclado_temas(materia), parse_mode="Markdown")
+        await query.edit_message_text(f"Boa! Qual assunto de <b>{materia}</b> vamos revisar?", reply_markup=ui.teclado_temas(materia), parse_mode="HTML")
 
     elif data.startswith("tema_"):
         tema = data.split("_", 1)[1]
         doc_usuario = colecao_hist.find_one({"user_id": user_id}) or {}
         materia = doc_usuario.get("materia_atual")
         colecao_hist.update_one({"user_id": user_id}, {"$set": {"tema_atual": tema}}, upsert=True)
-        await query.edit_message_text(f"Que estilo de questão de **{tema}** você quer?", reply_markup=ui.teclado_tipos(materia, tema), parse_mode="Markdown")
+        await query.edit_message_text(f"Que estilo de questão de <b>{tema}</b> você quer?", reply_markup=ui.teclado_tipos(materia, tema), parse_mode="HTML")
 
     elif data.startswith("type_"):
         tipo = data.split("_", 1)[1]
@@ -85,11 +85,18 @@ async def enviar_questao(update_or_query, context, user_id, tema, tipo):
         return
 
     q = q_list[0]
-    texto_q = f"📝 **{q.get('TIPO', 'Questão')}** | **Assunto:** {q.get('CONTEUDO')}\n\n"
-    texto_q += f"{q.get('PERGUNTA')}\n\n"
+    texto_q = f"📝 <b>{q.get('TIPO', 'Questão')}</b> | <b>Assunto:</b> {q.get('CONTEUDO')}\n\n"
+    
+    # --- FILTRO DE PROTEÇÃO HTML (Evita quebrar com matemática) ---
+    pergunta_limpa = str(q.get('PERGUNTA', '')).replace('<', '&lt;').replace('>', '&gt;')
+    texto_q += f"{pergunta_limpa}\n\n"
+    
     for letra in ["A", "B", "C", "D"]:
-        texto_q += f"**{letra})** {q.get(letra)}\n"
-    texto_q += "\n✍️ *Mande apenas a letra da resposta correta:*"
+        opcao_limpa = str(q.get(letra, '')).replace('<', '&lt;').replace('>', '&gt;')
+        texto_q += f"<b>{letra})</b> {opcao_limpa}\n"
+    # --------------------------------------------------------------
+    
+    texto_q += "\n✍️ <i>Mande apenas a letra da resposta correta:</i>"
 
     colecao_hist.update_one(
         {"user_id": user_id}, 
@@ -98,9 +105,9 @@ async def enviar_questao(update_or_query, context, user_id, tema, tipo):
     )
 
     if hasattr(update_or_query, 'edit_message_text'):
-        await update_or_query.edit_message_text(texto_q, reply_markup=ui.teclado_parar(), parse_mode="Markdown")
+        await update_or_query.edit_message_text(texto_q, reply_markup=ui.teclado_parar(), parse_mode="HTML")
     else:
-        await update_or_query.reply_text(texto_q, reply_markup=ui.teclado_parar(), parse_mode="Markdown")
+        await update_or_query.reply_text(texto_q, reply_markup=ui.teclado_parar(), parse_mode="HTML")
 
 async def responder(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -123,20 +130,21 @@ async def responder(update: Update, context: ContextTypes.DEFAULT_TYPE):
         tema_atual = doc_usuario.get("tema_atual")
         tipo_atual = doc_usuario.get("tipo_atual")
         
-        feedback = "✨ **BOA! Você acertou.**\n\n" if texto_upper == correta else f"⚠️ **Não foi dessa vez.** A correta era a **{correta}**.\n\n"
-        feedback += "🔎 **Análise das alternativas:**\n"
+        feedback = "✨ <b>BOA! Você acertou.</b>\n\n" if texto_upper == correta else f"⚠️ <b>Não foi dessa vez.</b> A correta era a <b>{correta}</b>.\n\n"
+        feedback += "🔎 <b>Análise das alternativas:</b>\n"
         
         for letra in ["A", "B", "C", "D"]:
-            explica = questao_ativa.get(f"COM_{letra}", "Sem explicação disponível.")
+            # Filtro de proteção HTML nas explicações também
+            explica = str(questao_ativa.get(f"COM_{letra}", "Sem explicação disponível.")).replace('<', '&lt;').replace('>', '&gt;')
             status = "✅" if letra == correta else "❌"
-            feedback += f"{status} **{letra}:** {explica}\n"
+            feedback += f"{status} <b>{letra}:</b> {explica}\n"
         
         colecao_hist.update_one(
             {"user_id": user_id}, 
             {"$set": {"ultima_entrada_usuario": texto_upper, "ultimo_feedback_completo": feedback}}
         )
         
-        await update.message.reply_text(feedback, reply_markup=ui.teclado_likert(), parse_mode="Markdown")
+        await update.message.reply_text(feedback, reply_markup=ui.teclado_likert(), parse_mode="HTML")
         await asyncio.sleep(2.0)
         await enviar_questao(update.message, context, user_id, tema_atual, tipo_atual)
     
@@ -153,5 +161,5 @@ if __name__ == '__main__':
     app.add_handler(CommandHandler("limpar", limpar))
     app.add_handler(CallbackQueryHandler(callback_handler)) 
     app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), responder))
-    print("Bot tá rodando com arquitetura modular! 🚀")
+    print("O Bot está rodando! 🚀")
     app.run_polling()
