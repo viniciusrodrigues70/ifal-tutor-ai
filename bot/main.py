@@ -1,4 +1,5 @@
 import re
+import random  # <-- Adicionado para fazer o embaralhamento
 import asyncio
 from datetime import datetime
 from telegram import Update
@@ -84,7 +85,38 @@ async def enviar_questao(update_or_query, context, user_id, tema, tipo):
         else: await update_or_query.message.reply_text(msg)
         return
 
+    # Pegamos a questão do banco
     q = q_list[0]
+
+    # =========================================================================
+    # LÓGICA DE EMBARALHAMENTO DAS ALTERNATIVAS
+    # =========================================================================
+    correta_original = str(q.get("CORRETA", "")).upper()
+    
+    # Empacotamos as opções junto com as explicações para elas não se perderem
+    opcoes_para_embaralhar = [
+        {"letra": "A", "texto": q.get("A", ""), "explicacao": q.get("COM_A", "")},
+        {"letra": "B", "texto": q.get("B", ""), "explicacao": q.get("COM_B", "")},
+        {"letra": "C", "texto": q.get("C", ""), "explicacao": q.get("COM_C", "")},
+        {"letra": "D", "texto": q.get("D", ""), "explicacao": q.get("COM_D", "")}
+    ]
+    
+    # Embaralha as alternativas magicamente
+    random.shuffle(opcoes_para_embaralhar)
+    
+    # Reconstrói a questão com as novas letras e acha o novo gabarito
+    letras_novas = ["A", "B", "C", "D"]
+    for i, nova_letra in enumerate(letras_novas):
+        # Atualiza o texto da alternativa
+        q[nova_letra] = opcoes_para_embaralhar[i]["texto"]
+        # Atualiza a explicação dessa alternativa
+        q[f"COM_{nova_letra}"] = opcoes_para_embaralhar[i]["explicacao"]
+        
+        # Se essa era a alternativa correta antes, ela define o novo gabarito
+        if opcoes_para_embaralhar[i]["letra"] == correta_original:
+            q["CORRETA"] = nova_letra
+    # =========================================================================
+
     texto_q = f"📝 <b>{q.get('TIPO', 'Questão')}</b> | <b>Assunto:</b> {q.get('CONTEUDO')}\n\n"
     
     # --- FILTRO DE PROTEÇÃO HTML (Evita quebrar com matemática) ---
@@ -92,12 +124,14 @@ async def enviar_questao(update_or_query, context, user_id, tema, tipo):
     texto_q += f"{pergunta_limpa}\n\n"
     
     for letra in ["A", "B", "C", "D"]:
+        # Usa os dados recém-embaralhados do dicionário 'q'
         opcao_limpa = str(q.get(letra, '')).replace('<', '&lt;').replace('>', '&gt;')
         texto_q += f"<b>{letra})</b> {opcao_limpa}\n"
     # --------------------------------------------------------------
     
     texto_q += "\n✍️ <i>Mande apenas a letra da resposta correta:</i>"
 
+    # Salva a questão 'q' (agora com as alternativas embaralhadas) no histórico
     colecao_hist.update_one(
         {"user_id": user_id}, 
         {"$set": {"questao_ativa": q, "ultimo_texto_bot": texto_q}, "$push": {"questoes_vistas": q["_id"]}}, 
