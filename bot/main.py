@@ -5,7 +5,6 @@ from datetime import datetime
 from telegram import Update
 from telegram.ext import Application, MessageHandler, filters, ContextTypes, CommandHandler, CallbackQueryHandler
 
-# Importando os nossos módulos recém-criados
 from config import TELEGRAM_TOKEN, ARQUIVO_AVALIACOES, colecao_hist, colecao_banco, colecao_avaliacoes
 from utils import salvar_avaliacao_json
 import ui
@@ -85,12 +84,9 @@ async def enviar_questao(update_or_query, context, user_id, tema, tipo):
         else: await update_or_query.message.reply_text(msg)
         return
 
-    # Pegamos a questão do banco
     q = q_list[0]
 
-    # =========================================================================
     # LÓGICA DE EMBARALHAMENTO DAS ALTERNATIVAS
-    # =========================================================================
     correta_original = str(q.get("CORRETA", "")).upper()
     
     # Empacotamos as opções junto com as explicações para elas não se perderem
@@ -100,19 +96,14 @@ async def enviar_questao(update_or_query, context, user_id, tema, tipo):
         {"letra": "C", "texto": q.get("C", ""), "explicacao": q.get("COM_C", "")},
         {"letra": "D", "texto": q.get("D", ""), "explicacao": q.get("COM_D", "")}
     ]
-    
-    # Embaralha as alternativas magicamente
+
     random.shuffle(opcoes_para_embaralhar)
-    
-    # Reconstrói a questão com as novas letras e acha o novo gabarito
+
     letras_novas = ["A", "B", "C", "D"]
     for i, nova_letra in enumerate(letras_novas):
-        # Atualiza o texto da alternativa
         q[nova_letra] = opcoes_para_embaralhar[i]["texto"]
-        # Atualiza a explicação dessa alternativa
         q[f"COM_{nova_letra}"] = opcoes_para_embaralhar[i]["explicacao"]
-        
-        # Se essa era a alternativa correta antes, ela define o novo gabarito
+
         if opcoes_para_embaralhar[i]["letra"] == correta_original:
             q["CORRETA"] = nova_letra
     # =========================================================================
@@ -124,7 +115,6 @@ async def enviar_questao(update_or_query, context, user_id, tema, tipo):
     texto_q += f"{pergunta_limpa}\n\n"
     
     for letra in ["A", "B", "C", "D"]:
-        # Usa os dados recém-embaralhados do dicionário 'q'
         opcao_limpa = str(q.get(letra, '')).replace('<', '&lt;').replace('>', '&gt;')
         texto_q += f"<b>{letra})</b> {opcao_limpa}\n"
     # --------------------------------------------------------------

@@ -34,7 +34,7 @@ try:
     
     # Teste de conexão real
     client.admin.command('ping')
-    print("🚀 Conexão com MongoDB estabelecida!")
+    print("Conexão com MongoDB estabelecida!")
 
 except Exception as e:
     print(f"\n❌ ERRO AO CONECTAR NO MONGO:")
